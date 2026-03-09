@@ -14,6 +14,13 @@ def load_manifest(repo_path: Path) -> dict:
         return yaml.safe_load(f) or {}
 
 
+def save_manifest(repo_path: Path, manifest: dict) -> None:
+    """Write manifest dict back to gapp.yaml."""
+    manifest_path = repo_path / "gapp.yaml"
+    with open(manifest_path, "w") as f:
+        yaml.dump(manifest, f, default_flow_style=False, sort_keys=False)
+
+
 def get_solution_name(manifest: dict, repo_path: Path) -> str:
     """Derive solution name from manifest or repo directory name."""
     solution = manifest.get("solution", {})

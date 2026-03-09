@@ -153,12 +153,12 @@ def solutions_restore(name):
 
 
 @main.group()
-def secret():
+def secrets():
     """Secret management for the current solution."""
 
 
-@secret.command("list")
-def secret_list():
+@secrets.command("list")
+def secrets_list_cmd():
     """Show prerequisite secrets and status."""
     from gapp.sdk.secrets import list_secrets
 
@@ -182,13 +182,15 @@ def secret_list():
     click.echo()
 
 
-@secret.command("set")
+@secrets.command("set")
 @click.argument("name")
-def secret_set(name):
+@click.argument("value", required=False)
+def secrets_set_cmd(name, value):
     """Store a secret value in Secret Manager."""
     from gapp.sdk.secrets import set_secret
 
-    value = click.prompt(f"  Enter value for {name}", hide_input=True)
+    if not value:
+        value = click.prompt(f"  Enter value for {name}", hide_input=True)
 
     try:
         result = set_secret(name, value)
@@ -197,3 +199,37 @@ def secret_set(name):
         raise SystemExit(1)
 
     click.echo(f"  Secret {result['name']} {result['secret_status']} \u2713")
+
+
+@secrets.command("add")
+@click.argument("name")
+@click.argument("description")
+@click.argument("value", required=False)
+def secrets_add_cmd(name, description, value):
+    """Declare a secret in gapp.yaml and optionally set its value."""
+    from gapp.sdk.secrets import add_secret
+
+    try:
+        result = add_secret(name, description, value)
+    except RuntimeError as e:
+        click.echo(f"  Error: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo(f"  Secret {result['name']} {result['manifest_status']} in gapp.yaml \u2713")
+    if result["value_status"]:
+        click.echo(f"  Value {result['value_status']} \u2713")
+
+
+@secrets.command("remove")
+@click.argument("name")
+def secrets_remove_cmd(name):
+    """Remove a secret declaration from gapp.yaml."""
+    from gapp.sdk.secrets import remove_secret
+
+    try:
+        result = remove_secret(name)
+    except RuntimeError as e:
+        click.echo(f"  Error: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo(f"  Secret {result['name']} removed from gapp.yaml \u2713")
