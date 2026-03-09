@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gapp"
+version = "0.1.0"
+description = "GCP App Deployer — CLI tool for deploying Cloud Run services with Terraform"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+gapp = "gapp.cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["gapp*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--ignore=tests/integration"
