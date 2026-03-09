@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from gapp.sdk.context import resolve_solution
@@ -191,27 +192,47 @@ def _image_exists(
     return tag in result.stdout
 
 
+def _get_dockerfile_template() -> Path:
+    """Get the path to gapp's standard Dockerfile template."""
+    return Path(__file__).resolve().parent.parent / "templates" / "Dockerfile"
+
+
 def _build_and_push(
     project_id: str, repo_path: Path, image: str, entrypoint: str,
 ) -> None:
-    """Build container via Cloud Build using git archive for source integrity."""
-    archive = subprocess.Popen(
-        ["git", "archive", "--format=tar.gz", "HEAD"],
-        stdout=subprocess.PIPE,
-        cwd=repo_path,
-    )
-    build = subprocess.run(
-        ["gcloud", "builds", "submit",
-         "--tag", image,
-         "--build-arg", f"ENTRYPOINT={entrypoint}",
-         "--project", project_id,
-         "-"],
-        stdin=archive.stdout,
-        text=True,
-    )
-    archive.wait()
-    if build.returncode != 0:
-        raise RuntimeError("Cloud Build failed. Check the build logs above.")
+    """Build container via Cloud Build using git archive for source integrity.
+
+    Extracts git archive HEAD to a temp dir, copies gapp's Dockerfile
+    template into it, and submits to Cloud Build.
+    """
+    with tempfile.TemporaryDirectory(prefix="gapp-build-") as build_dir:
+        # Extract committed source into temp dir
+        archive = subprocess.Popen(
+            ["git", "archive", "--format=tar", "HEAD"],
+            stdout=subprocess.PIPE,
+            cwd=repo_path,
+        )
+        subprocess.run(
+            ["tar", "xf", "-", "-C", build_dir],
+            stdin=archive.stdout,
+            check=True,
+        )
+        archive.wait()
+
+        # Copy gapp's Dockerfile template (overwrites any repo Dockerfile)
+        shutil.copy2(_get_dockerfile_template(), Path(build_dir) / "Dockerfile")
+
+        # Submit to Cloud Build
+        result = subprocess.run(
+            ["gcloud", "builds", "submit",
+             "--tag", image,
+             "--build-arg", f"ENTRYPOINT={entrypoint}",
+             "--project", project_id,
+             build_dir],
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("Cloud Build failed. Check the build logs above.")
 
 
 def _secret_name_to_env_var(name: str) -> str:

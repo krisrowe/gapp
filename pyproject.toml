@@ -23,6 +23,9 @@ gapp = "gapp.cli.main:main"
 [tool.setuptools.packages.find]
 include = ["gapp*"]
 
+[tool.setuptools.package-data]
+gapp = ["templates/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--ignore=tests/integration"
