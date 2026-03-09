@@ -74,7 +74,7 @@ def _add_github_topic(repo_path: Path) -> str:
 
         import json
         data = json.loads(check.stdout)
-        topics = [t["name"] for t in data.get("repositoryTopics", [])]
+        topics = [t["name"] for t in (data.get("repositoryTopics") or [])]
 
         if "gapp-solution" in topics:
             return "already_set"
