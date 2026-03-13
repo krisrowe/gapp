@@ -237,7 +237,7 @@ def secrets_remove_cmd(name):
 
 @main.group()
 def users():
-    """User management for the current solution."""
+    """Manage upstream credentials — the real API tokens the solution uses."""
 
 
 @users.command("register")
@@ -245,7 +245,7 @@ def users():
 @click.argument("credential")
 @click.option("--strategy", default="bearer", help="Credential strategy (default: bearer).")
 def users_register_cmd(email, credential, strategy):
-    """Register a new user with an upstream credential."""
+    """Register a user and store their upstream credential (e.g., API token)."""
     from gapp.sdk.users import register_user
 
     try:
@@ -297,9 +297,9 @@ def users_list_cmd(limit, start_index):
 @users.command("update")
 @click.argument("email")
 @click.option("--credential", default=None, help="New upstream credential value.")
-@click.option("--revoke-before", default=None, help="ISO 8601 timestamp — reject JWTs issued before this time.")
+@click.option("--revoke-before", default=None, help="ISO 8601 timestamp — reject tokens issued before this time.")
 def users_update_cmd(email, credential, revoke_before):
-    """Update a user's credential or set revoke_before."""
+    """Update a user's upstream credential or set revoke_before timestamp."""
     from gapp.sdk.users import update_user
 
     try:
@@ -324,3 +324,46 @@ def users_revoke_cmd(email):
         raise SystemExit(1)
 
     click.echo(f"  User {result['email']} revoked \u2713")
+
+
+@main.group()
+def tokens():
+    """Manage PATs (personal access tokens) — what clients send to authenticate."""
+
+
+@tokens.command("create")
+@click.argument("email")
+@click.option("--duration", default=3650, type=int, help="Token duration in days (default: 3650 / ~10 years).")
+def tokens_create_cmd(email, duration):
+    """Create a signed PAT (JWT) that a client uses to call the solution."""
+    from gapp.sdk.tokens import create_token
+
+    try:
+        result = create_token(email, duration_days=duration)
+    except RuntimeError as e:
+        click.echo(f"  Error: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo()
+    click.echo(f"  Token created for {result['email']}")
+    click.echo(f"    Solution: {result['solution']}")
+    click.echo(f"    Expires:  {result['expires_at']}")
+    click.echo()
+    click.echo(f"  {result['token']}")
+    click.echo()
+
+
+@tokens.command("revoke")
+@click.argument("email")
+def tokens_revoke_cmd(email):
+    """Invalidate all PATs for a user (sets revoke_before to now)."""
+    from gapp.sdk.tokens import revoke_tokens
+
+    try:
+        result = revoke_tokens(email)
+    except RuntimeError as e:
+        click.echo(f"  Error: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo(f"  All tokens for {result['email']} revoked \u2713")
+    click.echo(f"    revoke_before: {result['revoke_before']}")
