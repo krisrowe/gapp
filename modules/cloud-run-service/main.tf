@@ -87,7 +87,7 @@ resource "google_cloud_run_v2_service" "service" {
         for_each = var.auth_enabled ? [1] : []
         content {
           name       = "auth-credentials"
-          mount_path = "/mnt/auth"
+          mount_path = "/mnt/gcs"
         }
       }
 
@@ -130,7 +130,7 @@ resource "google_cloud_run_v2_service" "service" {
         for_each = var.auth_enabled ? [1] : []
         content {
           name  = "GAPP_AUTH_MOUNT"
-          value = "/mnt/auth"
+          value = "/mnt/gcs/auth"
         }
       }
     }
