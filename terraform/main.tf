@@ -19,6 +19,8 @@ module "service" {
   public        = var.public
   env           = var.env
   secrets       = var.secrets
+  auth_enabled  = var.auth_enabled
+  auth_bucket   = var.auth_bucket
 }
 
 output "service_url" {

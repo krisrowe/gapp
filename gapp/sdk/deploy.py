@@ -9,6 +9,7 @@ from pathlib import Path
 
 from gapp.sdk.context import resolve_solution
 from gapp.sdk.manifest import (
+    get_auth_config,
     get_entrypoint,
     get_prerequisite_secrets,
     get_service_config,
@@ -59,6 +60,7 @@ def deploy_solution(auto_approve: bool = False) -> dict:
 
     service_config = get_service_config(manifest)
     secrets = get_prerequisite_secrets(manifest)
+    auth_config = get_auth_config(manifest)
 
     # Block if working tree is dirty
     head_sha = _get_head_sha(repo_path)
@@ -85,7 +87,11 @@ def deploy_solution(auto_approve: bool = False) -> dict:
     if _image_exists(project_id, region, solution_name, head_sha):
         result["build_status"] = "skipped"
     else:
-        _build_and_push(project_id, repo_path, image, service_config["entrypoint"])
+        _build_and_push(
+            project_id, repo_path, image,
+            service_config["entrypoint"],
+            auth_config=auth_config,
+        )
         result["build_status"] = "built"
     result["image"] = image
 
@@ -98,6 +104,7 @@ def deploy_solution(auto_approve: bool = False) -> dict:
         bucket_name=bucket_name,
         service_config=service_config,
         secrets=secrets,
+        auth_config=auth_config,
         token=token,
         auto_approve=auto_approve,
     )
@@ -197,13 +204,22 @@ def _get_template(name: str) -> Path:
     return Path(__file__).resolve().parent.parent / "templates" / name
 
 
+def _get_runtime_source_dir() -> Path:
+    """Get the path to gapp's runtime package source."""
+    return Path(__file__).resolve().parent.parent.parent / "run"
+
+
 def _build_and_push(
     project_id: str, repo_path: Path, image: str, entrypoint: str,
+    *, auth_config: dict | None = None,
 ) -> None:
     """Build container via Cloud Build using git archive for source integrity.
 
     Extracts git archive HEAD to a temp dir, copies gapp's Dockerfile
     template into it, and submits to Cloud Build.
+
+    When auth is enabled, also copies the gapp_run runtime package into the
+    build context and swaps the entrypoint to the wrapper.
     """
     with tempfile.TemporaryDirectory(prefix="gapp-build-") as build_dir:
         # Extract committed source into temp dir
@@ -223,11 +239,25 @@ def _build_and_push(
         shutil.copy2(_get_template("Dockerfile"), Path(build_dir) / "Dockerfile")
         shutil.copy2(_get_template("cloudbuild.yaml"), Path(build_dir) / "cloudbuild.yaml")
 
+        # When auth enabled: copy runtime package and swap entrypoint
+        build_entrypoint = entrypoint
+        if auth_config:
+            runtime_src = _get_runtime_source_dir()
+            runtime_dest = Path(build_dir) / ".gapp-run"
+            shutil.copytree(
+                runtime_src,
+                runtime_dest,
+                ignore=shutil.ignore_patterns(
+                    "__pycache__", "*.pyc", "*.egg-info", ".pytest_cache", "tests",
+                ),
+            )
+            build_entrypoint = "gapp_run.wrapper:app"
+
         # Submit to Cloud Build with substitutions for build arg
         result = subprocess.run(
             ["gcloud", "builds", "submit",
              "--config", f"{build_dir}/cloudbuild.yaml",
-             "--substitutions", f"_ENTRYPOINT={entrypoint},_IMAGE={image}",
+             "--substitutions", f"_ENTRYPOINT={build_entrypoint},_IMAGE={image}",
              "--project", project_id,
              build_dir],
             text=True,
@@ -253,8 +283,16 @@ def _build_tfvars(
     image: str,
     service_config: dict,
     secrets: dict | None = None,
+    auth_config: dict | None = None,
 ) -> dict:
     """Build the tfvars dict from manifest config."""
+    bucket_name = f"gapp-{solution_name}-{project_id}"
+    env = dict(service_config.get("env", {}))
+
+    # When auth enabled, set GAPP_APP so the wrapper knows what to import
+    if auth_config:
+        env["GAPP_APP"] = service_config["entrypoint"]
+
     tfvars = {
         "project_id": project_id,
         "service_name": solution_name,
@@ -263,11 +301,13 @@ def _build_tfvars(
         "cpu": service_config["cpu"],
         "max_instances": service_config["max_instances"],
         "public": service_config["public"],
-        "env": service_config.get("env", {}),
+        "env": env,
         "secrets": {
             _secret_name_to_env_var(name): name
             for name in (secrets or {})
         },
+        "auth_enabled": bool(auth_config),
+        "auth_bucket": bucket_name if auth_config else "",
     }
     return tfvars
 
@@ -285,6 +325,7 @@ def _stage_and_apply(
     bucket_name: str,
     service_config: dict,
     secrets: dict | None = None,
+    auth_config: dict | None = None,
     token: str = "",
     auto_approve: bool = False,
 ) -> dict:
@@ -302,7 +343,9 @@ def _stage_and_apply(
         shutil.copy2(tf_file, staging_dir)
 
     # Write tfvars.json
-    tfvars = _build_tfvars(solution_name, project_id, image, service_config, secrets)
+    tfvars = _build_tfvars(
+        solution_name, project_id, image, service_config, secrets, auth_config,
+    )
     (staging_dir / "terraform.tfvars.json").write_text(json.dumps(tfvars, indent=2))
 
     # Terraform init with GCS backend

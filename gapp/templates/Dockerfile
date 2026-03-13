@@ -10,7 +10,8 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
 COPY . /app
 
 RUN uv pip install --system "mcp[cli]" uvicorn \
-    && uv pip install --system -e .
+    && uv pip install --system -e . \
+    && if [ -d /app/.gapp-run ]; then uv pip install --system /app/.gapp-run; fi
 
 ARG ENTRYPOINT
 ENV ENTRYPOINT=${ENTRYPOINT}

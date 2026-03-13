@@ -42,6 +42,17 @@ def get_entrypoint(manifest: dict) -> str | None:
     return manifest.get("service", {}).get("entrypoint")
 
 
+def get_auth_config(manifest: dict) -> dict | None:
+    """Return auth configuration if enabled, else None."""
+    auth = manifest.get("service", {}).get("auth", {})
+    if not auth.get("enabled"):
+        return None
+    return {
+        "enabled": True,
+        "strategy": auth.get("strategy", "bearer"),
+    }
+
+
 def get_service_config(manifest: dict) -> dict:
     """Return service configuration with defaults."""
     service = manifest.get("service", {})
