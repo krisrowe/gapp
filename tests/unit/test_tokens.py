@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 import jwt as pyjwt
 import pytest
 
-from gapp.sdk.tokens import create_token, revoke_tokens, DEFAULT_DURATION_DAYS
+from gapp.admin.sdk.tokens import create_token, revoke_tokens, DEFAULT_DURATION_DAYS
 
 
 MOCK_CTX = {
@@ -28,9 +28,9 @@ def _mock_run(returncode=0, stdout="", stderr=""):
 
 
 class TestCreateToken:
-    @patch("gapp.sdk.tokens.subprocess.run")
-    @patch("gapp.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
-    @patch("gapp.sdk.tokens._object_exists", return_value=True)
+    @patch("gapp.admin.sdk.tokens.subprocess.run")
+    @patch("gapp.admin.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.tokens._object_exists", return_value=True)
     def test_creates_valid_jwt(self, mock_exists, mock_ctx, mock_run):
         # _get_signing_key reads from Secret Manager
         mock_run.return_value = _mock_run(stdout=SIGNING_KEY)
@@ -48,9 +48,9 @@ class TestCreateToken:
         assert "iat" in claims
         assert "exp" in claims
 
-    @patch("gapp.sdk.tokens.subprocess.run")
-    @patch("gapp.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
-    @patch("gapp.sdk.tokens._object_exists", return_value=True)
+    @patch("gapp.admin.sdk.tokens.subprocess.run")
+    @patch("gapp.admin.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.tokens._object_exists", return_value=True)
     def test_custom_duration(self, mock_exists, mock_ctx, mock_run):
         mock_run.return_value = _mock_run(stdout=SIGNING_KEY)
 
@@ -61,25 +61,25 @@ class TestCreateToken:
         expected_exp = claims["iat"] + (30 * 86400)
         assert claims["exp"] == expected_exp
 
-    @patch("gapp.sdk.tokens.subprocess.run")
-    @patch("gapp.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
-    @patch("gapp.sdk.tokens._object_exists", return_value=False)
+    @patch("gapp.admin.sdk.tokens.subprocess.run")
+    @patch("gapp.admin.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.tokens._object_exists", return_value=False)
     def test_unregistered_user_fails(self, mock_exists, mock_ctx, mock_run):
         with pytest.raises(RuntimeError, match="not registered"):
             create_token("nobody@example.com")
 
-    @patch("gapp.sdk.tokens.subprocess.run")
-    @patch("gapp.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
-    @patch("gapp.sdk.tokens._object_exists", return_value=True)
+    @patch("gapp.admin.sdk.tokens.subprocess.run")
+    @patch("gapp.admin.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.tokens._object_exists", return_value=True)
     def test_missing_signing_key_fails(self, mock_exists, mock_ctx, mock_run):
         mock_run.return_value = _mock_run(returncode=1, stderr="NOT_FOUND")
 
         with pytest.raises(RuntimeError, match="signing key"):
             create_token("user@example.com")
 
-    @patch("gapp.sdk.tokens.subprocess.run")
-    @patch("gapp.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
-    @patch("gapp.sdk.tokens._object_exists", return_value=True)
+    @patch("gapp.admin.sdk.tokens.subprocess.run")
+    @patch("gapp.admin.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.tokens._object_exists", return_value=True)
     def test_default_duration_is_10_years(self, mock_exists, mock_ctx, mock_run):
         assert DEFAULT_DURATION_DAYS == 3650
         mock_run.return_value = _mock_run(stdout=SIGNING_KEY)
@@ -92,10 +92,10 @@ class TestCreateToken:
 
 
 class TestRevokeTokens:
-    @patch("gapp.sdk.tokens._write_credential")
-    @patch("gapp.sdk.tokens._read_credential_full")
-    @patch("gapp.sdk.tokens._object_exists", return_value=True)
-    @patch("gapp.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.tokens._write_credential")
+    @patch("gapp.admin.sdk.tokens._read_credential_full")
+    @patch("gapp.admin.sdk.tokens._object_exists", return_value=True)
+    @patch("gapp.admin.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
     def test_sets_revoke_before(self, mock_ctx, mock_exists, mock_read, mock_write):
         mock_read.return_value = {
             "strategy": "bearer",
@@ -114,16 +114,16 @@ class TestRevokeTokens:
         assert written["credential"] == "token"  # preserved
         assert written["sub"] == "user@example.com"  # preserved
 
-    @patch("gapp.sdk.tokens._object_exists", return_value=False)
-    @patch("gapp.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.tokens._object_exists", return_value=False)
+    @patch("gapp.admin.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
     def test_nonexistent_user_fails(self, mock_ctx, mock_exists):
         with pytest.raises(RuntimeError, match="not found"):
             revoke_tokens("nobody@example.com")
 
-    @patch("gapp.sdk.tokens._write_credential")
-    @patch("gapp.sdk.tokens._read_credential_full")
-    @patch("gapp.sdk.tokens._object_exists", return_value=True)
-    @patch("gapp.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.tokens._write_credential")
+    @patch("gapp.admin.sdk.tokens._read_credential_full")
+    @patch("gapp.admin.sdk.tokens._object_exists", return_value=True)
+    @patch("gapp.admin.sdk.tokens.resolve_solution", return_value=MOCK_CTX)
     def test_preserves_existing_fields(self, mock_ctx, mock_exists, mock_read, mock_write):
         mock_read.return_value = {
             "strategy": "google_oauth2",

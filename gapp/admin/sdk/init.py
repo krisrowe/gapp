@@ -3,9 +3,9 @@
 import subprocess
 from pathlib import Path
 
-from gapp.sdk.config import load_solutions, save_solutions
-from gapp.sdk.context import get_git_root
-from gapp.sdk.manifest import get_solution_name, load_manifest
+from gapp.admin.sdk.config import load_solutions, save_solutions
+from gapp.admin.sdk.context import get_git_root
+from gapp.admin.sdk.manifest import get_solution_name, load_manifest
 
 
 def init_solution(repo_path: Path | None = None) -> dict:

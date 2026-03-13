@@ -7,8 +7,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from gapp.sdk.context import resolve_solution
-from gapp.sdk.manifest import (
+from gapp.admin.sdk.context import resolve_solution
+from gapp.admin.sdk.manifest import (
     get_auth_config,
     get_entrypoint,
     get_prerequisite_secrets,
@@ -222,7 +222,7 @@ def _image_exists(
 
 def _get_template(name: str) -> Path:
     """Get the path to a gapp template file."""
-    return Path(__file__).resolve().parent.parent / "templates" / name
+    return Path(__file__).resolve().parent.parent.parent / "templates" / name
 
 
 def _build_and_push(
@@ -292,7 +292,7 @@ def _secret_name_to_env_var(name: str) -> str:
 def _get_tf_source_dir() -> Path:
     """Get the path to gapp's static Terraform files."""
     # Walk up from this file to find the repo root's terraform/ directory
-    return Path(__file__).resolve().parent.parent.parent / "terraform"
+    return Path(__file__).resolve().parent.parent.parent.parent / "terraform"
 
 
 def _build_tfvars(

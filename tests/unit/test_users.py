@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from gapp.sdk.users import (
+from gapp.admin.sdk.users import (
     register_user,
     list_users,
     revoke_user,
@@ -47,8 +47,8 @@ class TestHelpers:
 
 
 class TestRegisterUser:
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_registers_new_user(self, mock_ctx, mock_run):
         # stat returns 1 (not found), cp returns 0 (success)
         mock_run.side_effect = [
@@ -69,16 +69,16 @@ class TestRegisterUser:
         assert written["sub"] == "user@example.com"
         assert written["strategy"] == "bearer"
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_rejects_duplicate_user(self, mock_ctx, mock_run):
         mock_run.return_value = _mock_subprocess_run(returncode=0)  # stat — exists
 
         with pytest.raises(RuntimeError, match="already registered"):
             register_user("user@example.com", "my-token")
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_custom_strategy(self, mock_ctx, mock_run):
         mock_run.side_effect = [
             _mock_subprocess_run(returncode=1),  # stat
@@ -90,8 +90,8 @@ class TestRegisterUser:
 
 
 class TestListUsers:
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_lists_users(self, mock_ctx, mock_run):
         eh = _email_hash("user@example.com")
         cred = json.dumps({
@@ -113,8 +113,8 @@ class TestListUsers:
         # credential value should NOT be in metadata
         assert "credential" not in result["users"][0]
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_empty_bucket(self, mock_ctx, mock_run):
         mock_run.return_value = _mock_subprocess_run(returncode=1)  # ls fails
 
@@ -122,8 +122,8 @@ class TestListUsers:
         assert result["total"] == 0
         assert result["users"] == []
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_pagination_limit(self, mock_ctx, mock_run):
         paths = "\n".join(f"gs://bucket/auth/hash{i}.json" for i in range(5))
         cred = json.dumps({"sub": "u", "strategy": "bearer", "created": ""})
@@ -138,8 +138,8 @@ class TestListUsers:
         assert result["total"] == 5
         assert len(result["users"]) == 2
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_pagination_start_index(self, mock_ctx, mock_run):
         paths = "\n".join(f"gs://bucket/auth/hash{i}.json" for i in range(5))
         cred = json.dumps({"sub": "u", "strategy": "bearer", "created": ""})
@@ -156,8 +156,8 @@ class TestListUsers:
 
 
 class TestUpdateUser:
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_updates_credential(self, mock_ctx, mock_run):
         existing = json.dumps({
             "strategy": "bearer",
@@ -179,8 +179,8 @@ class TestUpdateUser:
         assert written["credential"] == "new-token"
         assert written["sub"] == "user@example.com"  # preserved
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_sets_revoke_before(self, mock_ctx, mock_run):
         existing = json.dumps({
             "strategy": "bearer",
@@ -202,8 +202,8 @@ class TestUpdateUser:
         assert written["revoke_before"] == "2026-03-15T14:30:00Z"
         assert written["credential"] == "token"  # unchanged
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_updates_both(self, mock_ctx, mock_run):
         existing = json.dumps({
             "strategy": "bearer",
@@ -225,16 +225,16 @@ class TestUpdateUser:
 
         assert set(result["changes"]) == {"credential", "revoke_before"}
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_update_nonexistent_user_fails(self, mock_ctx, mock_run):
         mock_run.return_value = _mock_subprocess_run(returncode=1)  # stat — not found
 
         with pytest.raises(RuntimeError, match="not found"):
             update_user("nobody@example.com", credential="x")
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_update_nothing_fails(self, mock_ctx, mock_run):
         existing = json.dumps({"strategy": "bearer", "credential": "x", "sub": "u"})
         mock_run.side_effect = [
@@ -247,8 +247,8 @@ class TestUpdateUser:
 
 
 class TestRevokeUser:
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_revokes_existing_user(self, mock_ctx, mock_run):
         mock_run.side_effect = [
             _mock_subprocess_run(returncode=0),  # stat — exists
@@ -260,8 +260,8 @@ class TestRevokeUser:
         assert result["status"] == "revoked"
         assert result["email"] == "user@example.com"
 
-    @patch("gapp.sdk.users.subprocess.run")
-    @patch("gapp.sdk.users.resolve_solution", return_value=MOCK_CTX)
+    @patch("gapp.admin.sdk.users.subprocess.run")
+    @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_revoke_nonexistent_user_fails(self, mock_ctx, mock_run):
         mock_run.return_value = _mock_subprocess_run(returncode=1)  # stat — not found
 

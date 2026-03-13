@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from gapp.sdk.config import load_solutions
+from gapp.admin.sdk.config import load_solutions
 
 
 def _display_path(path: str | None) -> str | None:

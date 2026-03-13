@@ -3,9 +3,9 @@
 import json
 import subprocess
 
-from gapp.sdk.config import load_solutions, save_solutions
-from gapp.sdk.context import get_git_root, resolve_solution
-from gapp.sdk.manifest import get_required_apis, load_manifest
+from gapp.admin.sdk.config import load_solutions, save_solutions
+from gapp.admin.sdk.context import get_git_root, resolve_solution
+from gapp.admin.sdk.manifest import get_required_apis, load_manifest
 
 # APIs that every gapp solution needs — enabled automatically
 _FOUNDATION_APIS = [

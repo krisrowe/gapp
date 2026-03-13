@@ -1,5 +1,7 @@
 """gapp CLI — GCP App Deployer."""
 
+import json as json_mod
+
 import click
 
 from gapp import __version__
@@ -14,7 +16,7 @@ def main():
 @main.command()
 def init():
     """Initialize current repo for gapp (local only)."""
-    from gapp.sdk.init import init_solution
+    from gapp.admin.sdk.init import init_solution
 
     try:
         result = init_solution()
@@ -37,7 +39,7 @@ def init():
 @click.argument("project_id", required=False)
 def setup_cmd(project_id):
     """GCP foundation: enable APIs, create solution bucket, label project."""
-    from gapp.sdk.setup import setup_solution
+    from gapp.admin.sdk.setup import setup_solution
 
     try:
         result = setup_solution(project_id)
@@ -68,7 +70,7 @@ def setup_cmd(project_id):
 @click.option("--ref", default=None, help="Git ref (commit, tag, branch) to deploy. Skips dirty tree check.")
 def deploy(ref):
     """Build + terraform apply (requires setup + prerequisites)."""
-    from gapp.sdk.deploy import deploy_solution
+    from gapp.admin.sdk.deploy import deploy_solution
 
     try:
         result = deploy_solution(auto_approve=True, ref=ref)
@@ -94,60 +96,49 @@ def plan():
 
 @main.command()
 @click.argument("name", required=False)
-def status(name):
-    """Full health check across all phases."""
-    from gapp.sdk.status import get_status
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+def status(name, as_json):
+    """Infrastructure health check with guided next steps."""
+    from gapp.admin.sdk.status import get_status
 
     result = get_status(name)
 
-    if result.get("error") == "not_found":
-        click.echo("  Not inside a gapp solution. Specify a name or cd into a repo.")
-        click.echo("  Run: gapp solutions list")
+    if as_json:
+        click.echo(json_mod.dumps(result.model_dump(), indent=2))
+        return
+
+    if result.error:
+        click.echo(f"  {result.next_step.hint}")
         raise SystemExit(1)
 
     click.echo()
-    click.echo(f"  {result['name']} \u2192 {result['project_id'] or '(no project attached)'}")
+    click.echo(f"  {result.name} \u2192 {result.project_id or '(no project attached)'}")
     click.echo()
 
-    if not result["project_id"]:
-        click.echo("  No GCP project attached.")
-        click.echo("  Next: gapp setup <project-id>")
+    if result.next_step:
+        click.echo(f"  {result.next_step.hint}")
         return
 
-    if not result["deployed"]:
-        click.echo("  Not deployed (no Terraform state found).")
-        click.echo("  Next: gapp deploy")
-        return
-
-    for svc in result["services"]:
-        health = "\u2713 healthy" if svc["healthy"] else "\u2717 unhealthy"
-        click.echo(f"  {svc['name']}")
-        click.echo(f"    URL:    {svc['url']}")
+    for svc in result.services:
+        health = "\u2713 healthy" if svc.healthy else "\u2717 unhealthy"
+        click.echo(f"  {svc.name}")
+        click.echo(f"    URL:    {svc.url}")
         click.echo(f"    Health: {health}")
-        if svc.get("auth_enabled"):
+        if svc.auth_enabled:
             click.echo(f"    Auth:   enabled")
-
-        tools = svc.get("tools")
-        if tools is not None:
-            click.echo(f"    MCP:    {svc.get('mcp_path', '/mcp')} ({len(tools)} tools)")
-            for tool_name in sorted(tools):
-                click.echo(f"      \u2022 {tool_name}")
-        elif svc.get("mcp_path"):
-            click.echo(f"    MCP:    {svc['mcp_path']} (could not enumerate tools)")
+        if svc.mcp_path:
+            click.echo(f"    MCP:    {svc.mcp_path} (run gapp mcp status for tools)")
 
     click.echo()
 
 
-@main.group()
-def solutions():
-    """Solution listing and discovery."""
+# --- Top-level commands (promoted from solutions subgroup) ---
 
-
-@solutions.command("list")
+@main.command("list")
 @click.option("--available", is_flag=True, help="Include remote GitHub solutions.")
-def solutions_list(available):
-    """List local (and optionally GitHub) solutions."""
-    from gapp.sdk.solutions import list_solutions
+def list_cmd(available):
+    """List registered solutions."""
+    from gapp.admin.sdk.solutions import list_solutions
 
     results = list_solutions(include_remote=available)
 
@@ -166,13 +157,15 @@ def solutions_list(available):
     click.echo()
 
 
-@solutions.command("restore")
+@main.command()
 @click.argument("name")
-def solutions_restore(name):
+def restore(name):
     """Clone from GitHub + find GCP project."""
     click.echo("  restore is not yet implemented.")
     raise SystemExit(1)
 
+
+# --- Secrets ---
 
 @main.group()
 def secrets():
@@ -182,7 +175,7 @@ def secrets():
 @secrets.command("list")
 def secrets_list_cmd():
     """Show prerequisite secrets and status."""
-    from gapp.sdk.secrets import list_secrets
+    from gapp.admin.sdk.secrets import list_secrets
 
     try:
         result = list_secrets()
@@ -209,7 +202,7 @@ def secrets_list_cmd():
 @click.argument("value", required=False)
 def secrets_set_cmd(name, value):
     """Store a secret value in Secret Manager."""
-    from gapp.sdk.secrets import set_secret
+    from gapp.admin.sdk.secrets import set_secret
 
     if not value:
         value = click.prompt(f"  Enter value for {name}", hide_input=True)
@@ -229,7 +222,7 @@ def secrets_set_cmd(name, value):
 @click.argument("value", required=False)
 def secrets_add_cmd(name, description, value):
     """Declare a secret in gapp.yaml and optionally set its value."""
-    from gapp.sdk.secrets import add_secret
+    from gapp.admin.sdk.secrets import add_secret
 
     try:
         result = add_secret(name, description, value)
@@ -246,7 +239,7 @@ def secrets_add_cmd(name, description, value):
 @click.argument("name")
 def secrets_remove_cmd(name):
     """Remove a secret declaration from gapp.yaml."""
-    from gapp.sdk.secrets import remove_secret
+    from gapp.admin.sdk.secrets import remove_secret
 
     try:
         result = remove_secret(name)
@@ -256,6 +249,8 @@ def secrets_remove_cmd(name):
 
     click.echo(f"  Secret {result['name']} removed from gapp.yaml \u2713")
 
+
+# --- Users ---
 
 @main.group()
 def users():
@@ -268,7 +263,7 @@ def users():
 @click.option("--strategy", default="bearer", help="Credential strategy (default: bearer).")
 def users_register_cmd(email, credential, strategy):
     """Register a user and store their upstream credential (e.g., API token)."""
-    from gapp.sdk.users import register_user
+    from gapp.admin.sdk.users import register_user
 
     try:
         result = register_user(email, credential, strategy)
@@ -288,7 +283,7 @@ def users_register_cmd(email, credential, strategy):
 @click.option("--start-index", default=0, help="Offset into the user list.")
 def users_list_cmd(limit, start_index):
     """List registered users."""
-    from gapp.sdk.users import list_users
+    from gapp.admin.sdk.users import list_users
 
     try:
         result = list_users(limit=limit, start_index=start_index)
@@ -322,7 +317,7 @@ def users_list_cmd(limit, start_index):
 @click.option("--revoke-before", default=None, help="ISO 8601 timestamp — reject tokens issued before this time.")
 def users_update_cmd(email, credential, revoke_before):
     """Update a user's upstream credential or set revoke_before timestamp."""
-    from gapp.sdk.users import update_user
+    from gapp.admin.sdk.users import update_user
 
     try:
         result = update_user(email, credential=credential, revoke_before=revoke_before)
@@ -337,7 +332,7 @@ def users_update_cmd(email, credential, revoke_before):
 @click.argument("email")
 def users_revoke_cmd(email):
     """Revoke a user by deleting their credential file."""
-    from gapp.sdk.users import revoke_user
+    from gapp.admin.sdk.users import revoke_user
 
     try:
         result = revoke_user(email)
@@ -347,6 +342,8 @@ def users_revoke_cmd(email):
 
     click.echo(f"  User {result['email']} revoked \u2713")
 
+
+# --- Tokens ---
 
 @main.group()
 def tokens():
@@ -358,7 +355,7 @@ def tokens():
 @click.option("--duration", default=3650, type=int, help="Token duration in days (default: 3650 / ~10 years).")
 def tokens_create_cmd(email, duration):
     """Create a signed PAT (JWT) that a client uses to call the solution."""
-    from gapp.sdk.tokens import create_token
+    from gapp.admin.sdk.tokens import create_token
 
     try:
         result = create_token(email, duration_days=duration)
@@ -379,7 +376,7 @@ def tokens_create_cmd(email, duration):
 @click.argument("email")
 def tokens_revoke_cmd(email):
     """Invalidate all PATs for a user (sets revoke_before to now)."""
-    from gapp.sdk.tokens import revoke_tokens
+    from gapp.admin.sdk.tokens import revoke_tokens
 
     try:
         result = revoke_tokens(email)
@@ -389,3 +386,145 @@ def tokens_revoke_cmd(email):
 
     click.echo(f"  All tokens for {result['email']} revoked \u2713")
     click.echo(f"    revoke_before: {result['revoke_before']}")
+
+
+# --- MCP ---
+
+@main.group()
+def mcp():
+    """MCP service management — status, tools, and client configuration."""
+
+
+@mcp.command("status")
+@click.argument("name", required=False)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+def mcp_status_cmd(name, as_json):
+    """MCP health check with tool enumeration."""
+    from gapp.admin.sdk.mcp_status import mcp_status
+
+    result = mcp_status(name)
+
+    if as_json:
+        click.echo(json_mod.dumps(result.model_dump(), indent=2))
+        return
+
+    if result.error:
+        click.echo(f"  {result.next_step.hint}")
+        raise SystemExit(1)
+
+    if result.next_step:
+        click.echo()
+        click.echo(f"  {result.name} \u2192 {result.project_id or '(no project attached)'}")
+        click.echo(f"  {result.next_step.hint}")
+        click.echo()
+        return
+
+    click.echo()
+    click.echo(f"  {result.name} \u2192 {result.project_id}")
+    click.echo()
+    click.echo(f"  URL:    {result.mcp_url}")
+
+    health = "\u2713 healthy" if result.healthy else "\u2717 unhealthy"
+    click.echo(f"  Health: {health}")
+    if result.auth_enabled:
+        click.echo(f"  Auth:   enabled")
+
+    if result.tools is not None:
+        click.echo(f"  Tools:  {len(result.tools)}")
+        for tool_name in sorted(result.tools):
+            click.echo(f"    \u2022 {tool_name}")
+    else:
+        click.echo(f"  Tools:  could not enumerate")
+
+    click.echo()
+
+
+@mcp.command("list")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+def mcp_list_cmd(as_json):
+    """List solutions with MCP endpoints configured."""
+    from gapp.admin.sdk.mcp_status import mcp_list
+
+    results = mcp_list()
+
+    if as_json:
+        click.echo(json_mod.dumps([r.model_dump() for r in results], indent=2))
+        return
+
+    if not results:
+        click.echo("  No MCP-enabled solutions found.")
+        return
+
+    click.echo()
+    click.echo("  MCP SOLUTIONS")
+    for s in results:
+        project = s.project_id or "\u2014"
+        click.echo(f"    {s.name:<20} {project:<24} {s.mcp_path}")
+    click.echo()
+
+
+@mcp.command("connect")
+@click.argument("name", required=False)
+@click.option("--user", default=None, help="Email of registered user — mints a real PAT.")
+@click.option("--claude", default=None, metavar="SCOPE", help="Show Claude Code config for scope (user/project).")
+@click.option("--gemini", default=None, metavar="SCOPE", help="Show Gemini CLI config for scope (user/project).")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+def mcp_connect_cmd(name, user, claude, gemini, as_json):
+    """Show MCP client connection info and registration status."""
+    from gapp.admin.sdk.mcp_status import mcp_connect
+
+    result = mcp_connect(name, user=user)
+
+    if as_json:
+        click.echo(json_mod.dumps(result.model_dump(), indent=2))
+        return
+
+    if result.error:
+        click.echo(f"  {result.next_step.hint}")
+        raise SystemExit(1)
+
+    if result.next_step:
+        click.echo(f"  {result.next_step.hint}")
+        return
+
+    health = "\u2713 healthy" if result.healthy else "\u2717 unhealthy"
+    click.echo()
+    click.echo(f"  {result.name} ({health})")
+    click.echo(f"  MCP URL: {result.mcp_url}")
+
+    if result.tools is not None:
+        click.echo(f"  Tools:   {len(result.tools)}")
+    click.echo()
+
+    clients = result.clients
+    show_claude = claude is not None or (claude is None and gemini is None)
+    show_gemini = gemini is not None or (claude is None and gemini is None)
+
+    if show_claude and clients.claude_code:
+        click.echo("  Claude Code")
+        cc = clients.claude_code
+        scopes = [claude] if claude else ["user", "project"]
+        for scope in scopes:
+            entry = getattr(cc, scope, None)
+            if entry:
+                reg = "\u2713 registered" if entry.registered else "\u2717 not registered"
+                click.echo(f"    {scope}: {reg}")
+                click.echo(f"      {entry.command}")
+        click.echo()
+
+    if show_gemini and clients.gemini_cli:
+        click.echo("  Gemini CLI")
+        gc = clients.gemini_cli
+        scopes = [gemini] if gemini else ["user", "project"]
+        for scope in scopes:
+            entry = getattr(gc, scope, None)
+            if entry:
+                reg = "\u2713 registered" if entry.registered else "\u2717 not registered"
+                click.echo(f"    {scope}: {reg}")
+                click.echo(f"      {entry.command}")
+        click.echo()
+
+    if clients.claude_ai and claude is None and gemini is None:
+        click.echo("  Claude.ai (manual)")
+        click.echo(f"    URL: {clients.claude_ai.url}")
+        click.echo()

@@ -6,8 +6,8 @@ from unittest.mock import patch, call
 
 import pytest
 
-from gapp.sdk.config import load_solutions, save_solutions
-from gapp.sdk.setup import setup_solution
+from gapp.admin.sdk.config import load_solutions, save_solutions
+from gapp.admin.sdk.setup import setup_solution
 
 
 def _make_solution(tmp_path, monkeypatch, name="my-app"):
@@ -26,9 +26,9 @@ def _make_solution(tmp_path, monkeypatch, name="my-app"):
     return repo
 
 
-@patch("gapp.sdk.setup._label_project", return_value="added")
-@patch("gapp.sdk.setup._create_bucket", return_value="created")
-@patch("gapp.sdk.setup._enable_api")
+@patch("gapp.admin.sdk.setup._label_project", return_value="added")
+@patch("gapp.admin.sdk.setup._create_bucket", return_value="created")
+@patch("gapp.admin.sdk.setup._enable_api")
 def test_setup_with_explicit_project(mock_api, mock_bucket, mock_label, tmp_path, monkeypatch):
     _make_solution(tmp_path, monkeypatch)
 
@@ -50,9 +50,9 @@ def test_setup_with_explicit_project(mock_api, mock_bucket, mock_label, tmp_path
     mock_label.assert_called_once_with("my-project", "my-app")
 
 
-@patch("gapp.sdk.setup._label_project", return_value="added")
-@patch("gapp.sdk.setup._create_bucket", return_value="created")
-@patch("gapp.sdk.setup._enable_api")
+@patch("gapp.admin.sdk.setup._label_project", return_value="added")
+@patch("gapp.admin.sdk.setup._create_bucket", return_value="created")
+@patch("gapp.admin.sdk.setup._enable_api")
 def test_setup_uses_cached_project(mock_api, mock_bucket, mock_label, tmp_path, monkeypatch):
     _make_solution(tmp_path, monkeypatch)
     solutions = load_solutions()
@@ -64,9 +64,9 @@ def test_setup_uses_cached_project(mock_api, mock_bucket, mock_label, tmp_path, 
     assert result["project_id"] == "cached-proj"
 
 
-@patch("gapp.sdk.setup._label_project", return_value="added")
-@patch("gapp.sdk.setup._create_bucket", return_value="created")
-@patch("gapp.sdk.setup._enable_api")
+@patch("gapp.admin.sdk.setup._label_project", return_value="added")
+@patch("gapp.admin.sdk.setup._create_bucket", return_value="created")
+@patch("gapp.admin.sdk.setup._enable_api")
 def test_setup_saves_project_to_cache(mock_api, mock_bucket, mock_label, tmp_path, monkeypatch):
     _make_solution(tmp_path, monkeypatch)
 
@@ -76,9 +76,9 @@ def test_setup_saves_project_to_cache(mock_api, mock_bucket, mock_label, tmp_pat
     assert solutions["my-app"]["project_id"] == "new-proj"
 
 
-@patch("gapp.sdk.setup._label_project", return_value="exists")
-@patch("gapp.sdk.setup._create_bucket", return_value="exists")
-@patch("gapp.sdk.setup._enable_api")
+@patch("gapp.admin.sdk.setup._label_project", return_value="exists")
+@patch("gapp.admin.sdk.setup._create_bucket", return_value="exists")
+@patch("gapp.admin.sdk.setup._enable_api")
 def test_setup_idempotent(mock_api, mock_bucket, mock_label, tmp_path, monkeypatch):
     _make_solution(tmp_path, monkeypatch)
 
@@ -96,7 +96,7 @@ def test_setup_fails_outside_solution(tmp_path, monkeypatch):
         setup_solution("proj")
 
 
-@patch("gapp.sdk.setup._discover_project_from_label", return_value=None)
+@patch("gapp.admin.sdk.setup._discover_project_from_label", return_value=None)
 def test_setup_fails_no_project(mock_discover, tmp_path, monkeypatch):
     _make_solution(tmp_path, monkeypatch)
 

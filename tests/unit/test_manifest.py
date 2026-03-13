@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from gapp.sdk.manifest import (
+from gapp.admin.sdk.manifest import (
     get_auth_config,
     get_entrypoint,
     get_prerequisite_secrets,

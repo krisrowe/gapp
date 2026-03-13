@@ -3,8 +3,8 @@
 import subprocess
 from pathlib import Path
 
-from gapp.sdk.config import save_solutions
-from gapp.sdk.context import get_git_root, resolve_solution
+from gapp.admin.sdk.config import save_solutions
+from gapp.admin.sdk.context import get_git_root, resolve_solution
 
 
 def _make_git_repo(path: Path) -> Path:

@@ -2,8 +2,8 @@
 
 from unittest.mock import patch
 
-from gapp.sdk.config import save_solutions
-from gapp.sdk.solutions import list_solutions
+from gapp.admin.sdk.config import save_solutions
+from gapp.admin.sdk.solutions import list_solutions
 
 
 def test_list_empty():
@@ -22,7 +22,7 @@ def test_list_local_solutions():
     assert all(r["source"] == "local" for r in results)
 
 
-@patch("gapp.sdk.solutions._discover_github_solutions", return_value=[
+@patch("gapp.admin.sdk.solutions._discover_github_solutions", return_value=[
     {"name": "remote-app", "project_id": None, "repo_path": None,
      "url": "https://github.com/user/remote-app", "source": "github"},
 ])
@@ -34,7 +34,7 @@ def test_list_with_remote(mock_discover):
     assert "remote-app" in names
 
 
-@patch("gapp.sdk.solutions._discover_github_solutions", return_value=[
+@patch("gapp.admin.sdk.solutions._discover_github_solutions", return_value=[
     {"name": "overlap", "project_id": None, "repo_path": None,
      "url": "https://github.com/user/overlap", "source": "github"},
 ])

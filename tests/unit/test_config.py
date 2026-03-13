@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from gapp.sdk.config import get_config_dir, load_solutions, save_solutions
+from gapp.admin.sdk.config import get_config_dir, load_solutions, save_solutions
 
 
 def test_config_dir_uses_xdg(tmp_path, monkeypatch):

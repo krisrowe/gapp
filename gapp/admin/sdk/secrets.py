@@ -3,8 +3,8 @@
 import subprocess
 from pathlib import Path
 
-from gapp.sdk.context import resolve_solution
-from gapp.sdk.manifest import get_prerequisite_secrets, load_manifest, save_manifest
+from gapp.admin.sdk.context import resolve_solution
+from gapp.admin.sdk.manifest import get_prerequisite_secrets, load_manifest, save_manifest
 
 
 def add_secret(secret_name: str, description: str, value: str | None = None) -> dict:
@@ -104,7 +104,7 @@ def set_secret(secret_name: str, value: str) -> dict:
         raise RuntimeError("No GCP project attached. Run 'gapp setup <project-id>' first.")
 
     repo_path = ctx.get("repo_path")
-    manifest = load_manifest(Path(repo_path)) if repo_path else {}
+    manifest = load_manifest(Path(repo_path).expanduser()) if repo_path else {}
     known_secrets = get_prerequisite_secrets(manifest)
 
     if secret_name not in known_secrets:
@@ -139,7 +139,7 @@ def list_secrets() -> dict:
 
     project_id = ctx.get("project_id")
     repo_path = ctx.get("repo_path")
-    manifest = load_manifest(Path(repo_path)) if repo_path else {}
+    manifest = load_manifest(Path(repo_path).expanduser()) if repo_path else {}
     known_secrets = get_prerequisite_secrets(manifest)
 
     secrets = []

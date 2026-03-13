@@ -6,7 +6,7 @@ import secrets
 import subprocess
 from datetime import datetime, timezone
 
-from gapp.sdk.context import resolve_solution
+from gapp.admin.sdk.context import resolve_solution
 
 
 def _get_bucket_name(ctx: dict) -> str:

@@ -1,6 +1,6 @@
 """Tests for gapp.sdk.deploy — build and tfvars logic."""
 
-from gapp.sdk.deploy import _build_tfvars, _get_template, _secret_name_to_env_var
+from gapp.admin.sdk.deploy import _build_tfvars, _get_template, _secret_name_to_env_var
 
 
 def test_dockerfile_template_exists():
@@ -120,4 +120,4 @@ def test_build_tfvars_auth_does_not_mutate_original_env():
 def test_dockerfile_template_supports_runtime_install():
     path = _get_template("Dockerfile")
     content = path.read_text()
-    assert ".gapp-run" in content
+    assert "RUNTIME_REF" in content

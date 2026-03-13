@@ -3,8 +3,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from gapp.sdk.config import load_solutions
-from gapp.sdk.init import init_solution
+from gapp.admin.sdk.config import load_solutions
+from gapp.admin.sdk.init import init_solution
 
 
 def _make_git_repo(path: Path) -> Path:
@@ -26,7 +26,7 @@ def _make_git_repo(path: Path) -> Path:
     return path
 
 
-@patch("gapp.sdk.init._add_github_topic", return_value="skipped")
+@patch("gapp.admin.sdk.init._add_github_topic", return_value="skipped")
 def test_init_creates_manifest(mock_topic, tmp_path):
     repo = _make_git_repo(tmp_path / "my-app")
     result = init_solution(repo_path=repo)
@@ -36,7 +36,7 @@ def test_init_creates_manifest(mock_topic, tmp_path):
     assert (repo / "gapp.yaml").exists()
 
 
-@patch("gapp.sdk.init._add_github_topic", return_value="skipped")
+@patch("gapp.admin.sdk.init._add_github_topic", return_value="skipped")
 def test_init_existing_manifest(mock_topic, tmp_path):
     repo = _make_git_repo(tmp_path / "my-app")
     (repo / "gapp.yaml").write_text("solution:\n  name: custom\n")
@@ -47,7 +47,7 @@ def test_init_existing_manifest(mock_topic, tmp_path):
     assert result["manifest_status"] == "exists"
 
 
-@patch("gapp.sdk.init._add_github_topic", return_value="skipped")
+@patch("gapp.admin.sdk.init._add_github_topic", return_value="skipped")
 def test_init_registers_in_solutions(mock_topic, tmp_path):
     repo = _make_git_repo(tmp_path / "my-app")
     init_solution(repo_path=repo)
@@ -57,7 +57,7 @@ def test_init_registers_in_solutions(mock_topic, tmp_path):
     assert solutions["my-app"]["repo_path"] == str(repo)
 
 
-@patch("gapp.sdk.init._add_github_topic", return_value="skipped")
+@patch("gapp.admin.sdk.init._add_github_topic", return_value="skipped")
 def test_init_idempotent(mock_topic, tmp_path):
     repo = _make_git_repo(tmp_path / "my-app")
 

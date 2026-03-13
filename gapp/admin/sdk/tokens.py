@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 
 import jwt
 
-from gapp.sdk.context import resolve_solution
-from gapp.sdk.users import _email_hash, _gcs_path, _object_exists, _read_credential_full, _write_credential
+from gapp.admin.sdk.context import resolve_solution
+from gapp.admin.sdk.users import _email_hash, _gcs_path, _object_exists, _read_credential_full, _write_credential
 
 DEFAULT_DURATION_DAYS = 3650  # 10 years
 
