@@ -22,7 +22,7 @@ gapp deploy                       # build container + terraform apply
 
 # If auth enabled in gapp.yaml:
 gapp users register user@example.com <credential>   # register a user
-gapp tokens create user@example.com                  # create a PAT for the user
+gapp tokens create user@example.com                  # create a personal access token (PAT)
 ```
 
 Each command is idempotent and tells you what to do next.
@@ -130,7 +130,7 @@ gapp manages Terraform, IAM, API enablement, service accounts, secret references
 
 ### Multi-User from Day One
 
-When auth is enabled, gapp injects a credential mediation wrapper at deploy time. Each user gets a long-lived PAT (JWT) and their upstream API credential is stored server-side. The solution never sees PATs or credential files — it receives a standard bearer token on every request.
+When auth is enabled, gapp injects a credential mediation wrapper at deploy time. Each user gets a long-lived personal access token (PAT) and their upstream API credential is stored server-side. The solution never sees PATs or credential files — it receives a standard bearer token on every request.
 
 - **Register users** with `gapp users register` — one credential file per user in GCS
 - **Issue PATs** with `gapp tokens create` — signed JWTs, default 10-year duration
