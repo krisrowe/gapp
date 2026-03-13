@@ -233,3 +233,94 @@ def secrets_remove_cmd(name):
         raise SystemExit(1)
 
     click.echo(f"  Secret {result['name']} removed from gapp.yaml \u2713")
+
+
+@main.group()
+def users():
+    """User management for the current solution."""
+
+
+@users.command("register")
+@click.argument("email")
+@click.argument("credential")
+@click.option("--strategy", default="bearer", help="Credential strategy (default: bearer).")
+def users_register_cmd(email, credential, strategy):
+    """Register a new user with an upstream credential."""
+    from gapp.sdk.users import register_user
+
+    try:
+        result = register_user(email, credential, strategy)
+    except RuntimeError as e:
+        click.echo(f"  Error: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo()
+    click.echo(f"  Registered {result['email']}")
+    click.echo(f"    Strategy: {result['strategy']}")
+    click.echo(f"    Hash:     {result['email_hash'][:12]}...")
+    click.echo()
+
+
+@users.command("list")
+@click.option("--limit", default=10, help="Maximum number of users to show.")
+@click.option("--start-index", default=0, help="Offset into the user list.")
+def users_list_cmd(limit, start_index):
+    """List registered users."""
+    from gapp.sdk.users import list_users
+
+    try:
+        result = list_users(limit=limit, start_index=start_index)
+    except RuntimeError as e:
+        click.echo(f"  Error: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo()
+    click.echo(f"  {result['name']} users ({result['total']} total)")
+    click.echo()
+
+    if not result["users"]:
+        click.echo("  No users registered.")
+        click.echo()
+        return
+
+    for u in result["users"]:
+        click.echo(f"    {u['sub']:<30} {u['strategy']:<16} {u['created']}")
+    click.echo()
+
+    shown = result["start_index"] + len(result["users"])
+    if shown < result["total"]:
+        click.echo(f"  Showing {result['start_index'] + 1}-{shown} of {result['total']}.")
+        click.echo(f"  Use --start-index={shown} to see more.")
+        click.echo()
+
+
+@users.command("update")
+@click.argument("email")
+@click.option("--credential", default=None, help="New upstream credential value.")
+@click.option("--revoke-before", default=None, help="ISO 8601 timestamp — reject JWTs issued before this time.")
+def users_update_cmd(email, credential, revoke_before):
+    """Update a user's credential or set revoke_before."""
+    from gapp.sdk.users import update_user
+
+    try:
+        result = update_user(email, credential=credential, revoke_before=revoke_before)
+    except RuntimeError as e:
+        click.echo(f"  Error: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo(f"  Updated {result['email']}: {', '.join(result['changes'])} \u2713")
+
+
+@users.command("revoke")
+@click.argument("email")
+def users_revoke_cmd(email):
+    """Revoke a user by deleting their credential file."""
+    from gapp.sdk.users import revoke_user
+
+    try:
+        result = revoke_user(email)
+    except RuntimeError as e:
+        click.echo(f"  Error: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo(f"  User {result['email']} revoked \u2713")
