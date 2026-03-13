@@ -136,12 +136,22 @@ resource "google_cloud_run_v2_service" "service" {
   }
 }
 
-# Grant service account access to secrets
-resource "google_project_iam_member" "secret_accessor" {
-  count   = length(var.secrets) > 0 || var.auth_enabled ? 1 : 0
-  project = var.project_id
-  role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:${google_service_account.service.email}"
+# Grant service account access to each prerequisite secret (not project-wide)
+resource "google_secret_manager_secret_iam_member" "prerequisite_secret" {
+  for_each  = var.secrets
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.service.email}"
+}
+
+# Grant service account access to the signing key secret (only when auth enabled)
+resource "google_secret_manager_secret_iam_member" "signing_key" {
+  count     = var.auth_enabled ? 1 : 0
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.signing_key[0].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.service.email}"
 }
 
 # Grant service account access to auth bucket (only when auth enabled)
