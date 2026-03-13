@@ -94,16 +94,12 @@ class TestListUsers:
     @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_lists_users(self, mock_ctx, mock_run):
         eh = _email_hash("user@example.com")
-        cred = json.dumps({
-            "sub": "user@example.com",
-            "strategy": "bearer",
-            "credential": "secret",
-            "created": "2026-03-13T00:00:00+00:00",
-        })
-        mock_run.side_effect = [
-            _mock_subprocess_run(stdout=f"gs://bucket/auth/{eh}.json\n"),  # ls
-            _mock_subprocess_run(stdout=cred),  # cat
-        ]
+        objects = json.dumps([{
+            "name": f"auth/{eh}.json",
+            "metadata": {"sub": "user@example.com", "strategy": "bearer"},
+            "updated": "2026-03-13T00:00:00+00:00",
+        }])
+        mock_run.return_value = _mock_subprocess_run(stdout=objects)
 
         result = list_users()
 
@@ -125,13 +121,8 @@ class TestListUsers:
     @patch("gapp.admin.sdk.users.subprocess.run")
     @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_pagination_limit(self, mock_ctx, mock_run):
-        paths = "\n".join(f"gs://bucket/auth/hash{i}.json" for i in range(5))
-        cred = json.dumps({"sub": "u", "strategy": "bearer", "created": ""})
-        mock_run.side_effect = [
-            _mock_subprocess_run(stdout=paths),  # ls
-            _mock_subprocess_run(stdout=cred),  # cat for hash0
-            _mock_subprocess_run(stdout=cred),  # cat for hash1
-        ]
+        objects = [{"name": f"auth/hash{i}.json", "metadata": {"sub": "u", "strategy": "bearer"}, "updated": ""} for i in range(5)]
+        mock_run.return_value = _mock_subprocess_run(stdout=json.dumps(objects))
 
         result = list_users(limit=2)
 
@@ -141,13 +132,8 @@ class TestListUsers:
     @patch("gapp.admin.sdk.users.subprocess.run")
     @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_pagination_start_index(self, mock_ctx, mock_run):
-        paths = "\n".join(f"gs://bucket/auth/hash{i}.json" for i in range(5))
-        cred = json.dumps({"sub": "u", "strategy": "bearer", "created": ""})
-        mock_run.side_effect = [
-            _mock_subprocess_run(stdout=paths),  # ls
-            _mock_subprocess_run(stdout=cred),  # cat for hash3
-            _mock_subprocess_run(stdout=cred),  # cat for hash4
-        ]
+        objects = [{"name": f"auth/hash{i}.json", "metadata": {"sub": "u", "strategy": "bearer"}, "updated": ""} for i in range(5)]
+        mock_run.return_value = _mock_subprocess_run(stdout=json.dumps(objects))
 
         result = list_users(limit=10, start_index=3)
 

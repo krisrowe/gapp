@@ -301,7 +301,9 @@ def users_list_cmd(limit, start_index):
         return
 
     for u in result["users"]:
-        click.echo(f"    {u['sub']:<30} {u['strategy']:<16} {u['created']}")
+        created = u.get("created", "")[:10]
+        updated = u.get("updated", "")[:10]
+        click.echo(f"    {u['sub']:<30} {u['strategy']:<10} created {created}  updated {updated}")
     click.echo()
 
     shown = result["start_index"] + len(result["users"])
@@ -309,6 +311,28 @@ def users_list_cmd(limit, start_index):
         click.echo(f"  Showing {result['start_index'] + 1}-{shown} of {result['total']}.")
         click.echo(f"  Use --start-index={shown} to see more.")
         click.echo()
+
+
+@users.command("get")
+@click.argument("identifier")
+def users_get_cmd(identifier):
+    """Get full user details by email or hash."""
+    from gapp.admin.sdk.users import get_user
+
+    try:
+        result = get_user(identifier)
+    except RuntimeError as e:
+        click.echo(f"  Error: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo()
+    click.echo(f"  {result['sub']}")
+    click.echo(f"    Hash:           {result['email_hash']}")
+    click.echo(f"    Strategy:       {result['strategy']}")
+    click.echo(f"    Created:        {result['created']}")
+    if result.get("revoke_before"):
+        click.echo(f"    Revoke before:  {result['revoke_before']}")
+    click.echo()
 
 
 @users.command("update")

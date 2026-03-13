@@ -39,11 +39,11 @@ def _gcs_path(bucket: str, email_hash: str) -> str:
 def _object_exists(gcs_path: str) -> bool:
     """Check if a GCS object exists."""
     result = subprocess.run(
-        ["gcloud", "storage", "stat", gcs_path],
+        ["gcloud", "storage", "ls", gcs_path],
         capture_output=True,
         text=True,
     )
-    return result.returncode == 0
+    return result.returncode == 0 and gcs_path in result.stdout
 
 
 def register_user(
@@ -83,7 +83,7 @@ def register_user(
 
 
 def list_users(*, limit: int = 10, start_index: int = 0) -> dict:
-    """List registered users by reading credential files from GCS.
+    """List registered users from GCS object metadata (no file reads).
 
     Returns dict with solution info and list of users.
     """
@@ -91,29 +91,39 @@ def list_users(*, limit: int = 10, start_index: int = 0) -> dict:
     bucket = _get_bucket_name(ctx)
     prefix = f"gs://{bucket}/auth/"
 
-    # List objects in auth/ prefix
+    # List objects with JSON output to get custom metadata
     result = subprocess.run(
-        ["gcloud", "storage", "ls", prefix],
+        ["gcloud", "storage", "ls", "--json", prefix],
         capture_output=True,
         text=True,
     )
 
     if result.returncode != 0:
-        # No auth/ prefix yet — empty list
         return {"name": ctx["name"], "users": [], "total": 0}
 
-    # Parse object paths
-    paths = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
-    total = len(paths)
+    try:
+        objects = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {"name": ctx["name"], "users": [], "total": 0}
 
-    # Apply pagination
-    page = paths[start_index:start_index + limit]
+    total = len(objects)
+    page = objects[start_index:start_index + limit]
 
     users = []
-    for path in page:
-        user_info = _read_credential_metadata(path)
-        if user_info:
-            users.append(user_info)
+    for obj in page:
+        # gcloud storage ls --json nests everything under obj["metadata"]
+        obj_meta = obj.get("metadata", {})
+        custom_meta = obj_meta.get("metadata", {})
+        name = obj_meta.get("name", "")
+        email_hash = name.rsplit("/", 1)[-1].replace(".json", "") if name else ""
+
+        users.append({
+            "email_hash": email_hash,
+            "sub": custom_meta.get("sub", ""),
+            "strategy": custom_meta.get("strategy", ""),
+            "created": obj_meta.get("timeCreated", ""),
+            "updated": obj_meta.get("updated", ""),
+        })
 
     return {
         "name": ctx["name"],
@@ -121,6 +131,34 @@ def list_users(*, limit: int = 10, start_index: int = 0) -> dict:
         "total": total,
         "start_index": start_index,
         "limit": limit,
+    }
+
+
+def get_user(identifier: str) -> dict:
+    """Get full user details by email or email hash.
+
+    Reads the credential file contents (excluding the raw credential value).
+    """
+    ctx = _require_context()
+    bucket = _get_bucket_name(ctx)
+
+    # If it looks like an email, hash it
+    if "@" in identifier:
+        eh = _email_hash(identifier)
+    else:
+        eh = identifier
+
+    gcs_path = _gcs_path(bucket, eh)
+    data = _read_credential_full(gcs_path)
+    if data is None:
+        raise RuntimeError(f"User '{identifier}' not found.")
+
+    return {
+        "email_hash": eh,
+        "sub": data.get("sub", ""),
+        "strategy": data.get("strategy", ""),
+        "created": data.get("created", ""),
+        "revoke_before": data.get("revoke_before"),
     }
 
 
@@ -194,10 +232,23 @@ def revoke_user(email: str) -> dict:
 
 
 def _write_credential(gcs_path: str, data: dict) -> None:
-    """Write a credential JSON file to GCS via stdin."""
+    """Write a credential JSON file to GCS via stdin with custom metadata."""
     payload = json.dumps(data)
+    cmd = ["gcloud", "storage", "cp", "-", gcs_path]
+
+    # Store email and strategy as GCS custom metadata so list can
+    # read them without fetching file contents.
+    metadata = {}
+    if data.get("sub"):
+        metadata["sub"] = data["sub"]
+    if data.get("strategy"):
+        metadata["strategy"] = data["strategy"]
+    if metadata:
+        pairs = ",".join(f"{k}={v}" for k, v in metadata.items())
+        cmd += [f"--custom-metadata={pairs}"]
+
     result = subprocess.run(
-        ["gcloud", "storage", "cp", "-", gcs_path],
+        cmd,
         input=payload,
         capture_output=True,
         text=True,
@@ -221,28 +272,3 @@ def _read_credential_full(gcs_path: str) -> dict | None:
         return None
 
 
-def _read_credential_metadata(gcs_path: str) -> dict | None:
-    """Read a credential file from GCS and return safe metadata (no secrets)."""
-    result = subprocess.run(
-        ["gcloud", "storage", "cat", gcs_path],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return None
-
-    try:
-        data = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return None
-
-    # Extract filename (email hash) from path
-    filename = gcs_path.rstrip("/").rsplit("/", 1)[-1]
-    email_hash = filename.replace(".json", "")
-
-    return {
-        "email_hash": email_hash,
-        "sub": data.get("sub", ""),
-        "strategy": data.get("strategy", ""),
-        "created": data.get("created", ""),
-    }
