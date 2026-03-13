@@ -388,7 +388,30 @@ def tokens_revoke_cmd(email):
     click.echo(f"    revoke_before: {result['revoke_before']}")
 
 
-# --- MCP ---
+# --- Admin (self-management) ---
+
+@main.group()
+def admin():
+    """Manage gapp itself — install admin MCP server into agent clients."""
+
+
+@admin.command("install")
+@click.argument("client", type=click.Choice(["claude", "gemini"]))
+@click.option("--scope", default="user", type=click.Choice(["user", "project"]), help="Registration scope (default: user).")
+def admin_install_cmd(client, scope):
+    """Register the gapp-admin MCP server with an agent client."""
+    from gapp.admin.sdk.self_install import install_admin_mcp
+
+    result = install_admin_mcp(client, scope)
+
+    if result["success"]:
+        click.echo(f"  gapp-admin registered with {result['client']} ({result['scope']}) \u2713")
+    else:
+        click.echo(f"  Failed to register: {result['output']}", err=True)
+        raise SystemExit(1)
+
+
+# --- MCP (deployed solutions) ---
 
 @main.group()
 def mcp():
