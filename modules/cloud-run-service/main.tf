@@ -44,9 +44,10 @@ resource "google_secret_manager_secret_version" "signing_key" {
 
 # Cloud Run v2 service
 resource "google_cloud_run_v2_service" "service" {
-  project  = var.project_id
-  name     = var.service_name
-  location = var.region
+  project             = var.project_id
+  name                = var.service_name
+  location            = var.region
+  deletion_protection = false
 
   template {
     service_account = google_service_account.service.email
