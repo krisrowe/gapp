@@ -15,6 +15,10 @@ gapp init                          # scaffold gapp.yaml, register locally
 gapp setup <gcp-project-id>       # enable APIs, create state bucket, label project
 gapp secret set <secret-name>     # populate secrets in Secret Manager
 gapp deploy                       # build container + terraform apply
+
+# If auth enabled in gapp.yaml:
+gapp users register user@example.com <credential>   # register a user
+gapp tokens create user@example.com                  # create a PAT for the user
 ```
 
 Each command is idempotent and tells you what to do next.
@@ -54,6 +58,9 @@ service:
   public: false         # default
   env:                  # default: {}
     LOG_LEVEL: "INFO"
+  auth:
+    enabled: true
+    strategy: bearer    # default; or google_oauth2
 ```
 
 ## Additional Commands
@@ -64,6 +71,12 @@ gapp plan                          Terraform plan (preview changes)
 gapp solutions list [--available]  List local (and optionally GitHub) solutions
 gapp solutions restore <name>     Clone from GitHub + find GCP project
 gapp secret list                   Show prerequisite secrets and status
+gapp users register <email> <credential>  Register a user with upstream credential
+gapp users list [--limit] [--start-index]  List registered users
+gapp users update <email> [options]        Update credential or set revoke_before
+gapp users revoke <email>                  Delete user's credential file
+gapp tokens create <email> [--duration]    Create a PAT (JWT) for a user
+gapp tokens revoke <email>                 Invalidate all PATs for a user
 ```
 
 ## Key Concepts
@@ -74,6 +87,7 @@ gapp secret list                   Show prerequisite secrets and status
 - **GitHub topic** — `gapp-solution` enables discovery via `gapp solutions list --available`.
 - **Image tagging** — images are tagged with the HEAD commit SHA. Builds are skipped if the image already exists.
 - **Source integrity** — `git archive HEAD` is used as the build source. Uncommitted changes and gitignored files are never included.
+- **Credential mediation** — when `auth.enabled`, gapp injects an ASGI wrapper (`gapp-run`) at deploy time that handles JWT-based client auth and upstream credential lookup via GCS FUSE. Solutions remain unaware of the auth layer.
 
 ## Prerequisites
 

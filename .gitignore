@@ -17,8 +17,10 @@ dist/
 # IDE
 .idea/
 .vscode/
-.claude/
-.gemini/
+.claude/*
+!.claude/settings.json
+.gemini/*
+!.gemini/settings.json
 
 # Terraform
 .terraform/
