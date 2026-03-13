@@ -12,6 +12,7 @@ from gapp.sdk.manifest import (
     get_auth_config,
     get_entrypoint,
     get_prerequisite_secrets,
+    get_runtime_ref,
     get_service_config,
     load_manifest,
 )
@@ -68,6 +69,7 @@ def deploy_solution(auto_approve: bool = False, ref: str | None = None) -> dict:
     service_config = get_service_config(manifest)
     secrets = get_prerequisite_secrets(manifest)
     auth_config = get_auth_config(manifest)
+    runtime_ref = get_runtime_ref(manifest)
 
     # Resolve git ref to a short SHA for image tagging
     if ref:
@@ -104,6 +106,7 @@ def deploy_solution(auto_approve: bool = False, ref: str | None = None) -> dict:
             service_config["entrypoint"],
             ref=deploy_ref,
             auth_config=auth_config,
+            runtime_ref=runtime_ref,
         )
         result["build_status"] = "built"
     result["image"] = image
@@ -222,22 +225,18 @@ def _get_template(name: str) -> Path:
     return Path(__file__).resolve().parent.parent / "templates" / name
 
 
-def _get_runtime_source_dir() -> Path:
-    """Get the path to gapp's runtime package source."""
-    return Path(__file__).resolve().parent.parent.parent / "run"
-
-
 def _build_and_push(
     project_id: str, repo_path: Path, image: str, entrypoint: str,
     *, ref: str = "HEAD", auth_config: dict | None = None,
+    runtime_ref: str | None = None,
 ) -> None:
     """Build container via Cloud Build using git archive for source integrity.
 
     Extracts git archive of the specified ref to a temp dir, copies gapp's
     Dockerfile template into it, and submits to Cloud Build.
 
-    When auth is enabled, also copies the gapp_run runtime package into the
-    build context and swaps the entrypoint to the wrapper.
+    When auth is enabled and runtime_ref is set, the Dockerfile installs
+    gapp_run from the gapp GitHub repo at the specified ref.
     """
     with tempfile.TemporaryDirectory(prefix="gapp-build-") as build_dir:
         # Extract committed source into temp dir
@@ -257,25 +256,26 @@ def _build_and_push(
         shutil.copy2(_get_template("Dockerfile"), Path(build_dir) / "Dockerfile")
         shutil.copy2(_get_template("cloudbuild.yaml"), Path(build_dir) / "cloudbuild.yaml")
 
-        # When auth enabled: copy runtime package and swap entrypoint
+        # When auth enabled: swap entrypoint to the gapp_run wrapper
         build_entrypoint = entrypoint
+        build_runtime_ref = ""
         if auth_config:
-            runtime_src = _get_runtime_source_dir()
-            runtime_dest = Path(build_dir) / ".gapp-run"
-            shutil.copytree(
-                runtime_src,
-                runtime_dest,
-                ignore=shutil.ignore_patterns(
-                    "__pycache__", "*.pyc", "*.egg-info", ".pytest_cache", "tests",
-                ),
-            )
+            if not runtime_ref:
+                raise RuntimeError(
+                    "Auth is enabled but no runtime version specified.\n"
+                    "  Add to gapp.yaml:\n"
+                    "    service:\n"
+                    "      runtime: main  # gapp git ref (tag, branch, or commit)"
+                )
             build_entrypoint = "gapp_run.wrapper:app"
+            build_runtime_ref = runtime_ref
 
-        # Submit to Cloud Build with substitutions for build arg
+        # Submit to Cloud Build with substitutions
         result = subprocess.run(
             ["gcloud", "builds", "submit",
              "--config", f"{build_dir}/cloudbuild.yaml",
-             "--substitutions", f"_ENTRYPOINT={build_entrypoint},_IMAGE={image}",
+             "--substitutions",
+             f"_ENTRYPOINT={build_entrypoint},_IMAGE={image},_RUNTIME_REF={build_runtime_ref}",
              "--project", project_id,
              build_dir],
             text=True,

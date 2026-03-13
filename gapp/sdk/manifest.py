@@ -53,6 +53,11 @@ def get_auth_config(manifest: dict) -> dict | None:
     }
 
 
+def get_runtime_ref(manifest: dict) -> str | None:
+    """Return the gapp runtime git ref if configured, else None."""
+    return manifest.get("service", {}).get("runtime")
+
+
 def get_mcp_path(manifest: dict) -> str | None:
     """Return the MCP endpoint path if configured, else None."""
     return manifest.get("service", {}).get("mcp_path")

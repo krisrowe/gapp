@@ -2,16 +2,17 @@ FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl git && rm -rf /var/lib/apt/lists/*
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && mv /root/.local/bin/uv /usr/local/bin/uv
 
 COPY . /app
 
+ARG RUNTIME_REF
 RUN uv pip install --system "mcp[cli]" uvicorn \
     && uv pip install --system -e . \
-    && if [ -d /app/.gapp-run ]; then uv pip install --system /app/.gapp-run; fi
+    && if [ -n "$RUNTIME_REF" ]; then uv pip install --system "gapp-run @ git+https://github.com/krisrowe/gapp.git@${RUNTIME_REF}#subdirectory=run"; fi
 
 ARG ENTRYPOINT
 ENV ENTRYPOINT=${ENTRYPOINT}

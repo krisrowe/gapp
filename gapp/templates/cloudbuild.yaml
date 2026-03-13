@@ -4,6 +4,8 @@ steps:
       - 'build'
       - '--build-arg'
       - 'ENTRYPOINT=${_ENTRYPOINT}'
+      - '--build-arg'
+      - 'RUNTIME_REF=${_RUNTIME_REF}'
       - '-t'
       - '${_IMAGE}'
       - '.'
