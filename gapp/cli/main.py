@@ -65,13 +65,12 @@ def setup_cmd(project_id):
 
 
 @main.command()
-@click.option("--yes", "-y", is_flag=True, help="Auto-approve terraform apply.")
-def deploy(yes):
+def deploy():
     """Build + terraform apply (requires setup + prerequisites)."""
     from gapp.sdk.deploy import deploy_solution
 
     try:
-        result = deploy_solution(auto_approve=yes)
+        result = deploy_solution(auto_approve=True)
     except RuntimeError as e:
         click.echo(f"  Error: {e}", err=True)
         raise SystemExit(1)
