@@ -26,6 +26,7 @@ This ties the operator to their laptop. You can't deploy from your phone, from C
 - **Don't hide reusable logic in private repos** (existing gapp principle #14). The CI/CD logic lives in gapp's reusable workflow. The private repo is just configuration.
 - **Derive, don't configure** (existing gapp principle #8). WIF pool names, service accounts, and workflow content are all derivable from convention. The only truly unique inputs are the GCP project ID and the operator's repo name.
 - **Each phase does one thing** (existing gapp principle). `gapp setup` handles GCP foundation (including WIF). `gapp ci init` handles GitHub wiring. They don't overlap.
+- **GitHub is optional.** The core lifecycle — `gapp init`, `gapp setup`, `gapp secret set`, `gapp deploy` — works with any local git repo. No GitHub account, no GitHub API, no GitHub Actions. GitHub is required only for discovery (`gapp list --available`) and CI/CD automation (`gapp ci`). The CI layer is additive — it calls `gapp deploy`, not the other way around.
 - **Security by scoping, not by obscurity.** Project IDs in a private repo aren't security — they're just configuration. Real security comes from WIF trust scoping, service account permissions, and workflow pinning.
 
 ## Constraints
