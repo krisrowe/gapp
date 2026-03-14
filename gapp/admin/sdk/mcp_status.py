@@ -144,7 +144,7 @@ def mcp_connect(name: str | None = None, *, user: str | None = None) -> ConnectR
     token_display = "<YOUR_PAT>"
     if user:
         try:
-            token_result = create_token(user, name=ctx["name"])
+            token_result = create_token(user, solution=ctx["name"])
             result.token = token_result["token"]
             token_display = token_result["token"]
             result.token_masked = token_display[:12] + "..."

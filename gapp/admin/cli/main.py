@@ -377,12 +377,13 @@ def tokens():
 @tokens.command("create")
 @click.argument("email")
 @click.option("--duration", default=3650, type=int, help="Token duration in days (default: 3650 / ~10 years).")
-def tokens_create_cmd(email, duration):
+@click.option("--solution", default=None, help="Solution name (default: current directory).")
+def tokens_create_cmd(email, duration, solution):
     """Create a signed PAT (JWT) that a client uses to call the solution."""
     from gapp.admin.sdk.tokens import create_token
 
     try:
-        result = create_token(email, duration_days=duration)
+        result = create_token(email, duration_days=duration, solution=solution)
     except RuntimeError as e:
         click.echo(f"  Error: {e}", err=True)
         raise SystemExit(1)
@@ -398,12 +399,13 @@ def tokens_create_cmd(email, duration):
 
 @tokens.command("revoke")
 @click.argument("email")
-def tokens_revoke_cmd(email):
+@click.option("--solution", default=None, help="Solution name (default: current directory).")
+def tokens_revoke_cmd(email, solution):
     """Invalidate all PATs for a user (sets revoke_before to now)."""
     from gapp.admin.sdk.tokens import revoke_tokens
 
     try:
-        result = revoke_tokens(email)
+        result = revoke_tokens(email, solution=solution)
     except RuntimeError as e:
         click.echo(f"  Error: {e}", err=True)
         raise SystemExit(1)
