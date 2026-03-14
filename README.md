@@ -62,12 +62,34 @@ service:
   public: false         # default
   env:                  # default: {}
     LOG_LEVEL: "INFO"
-  runtime: <gapp-git-ref>  # required when auth enabled; gapp_run version
   mcp_path: /mcp          # MCP endpoint path (enables gapp mcp commands)
+```
+
+### Credential Mediation (Runtime Wrapper)
+
+If your solution accesses a third-party API on behalf of users (e.g., Monarch Money, Google Workspace), enable credential mediation. gapp injects an ASGI wrapper at deploy time that handles client authentication and upstream credential management. Solutions remain unaware of the auth layer — they receive a standard `Authorization: Bearer <upstream-token>` header on every request.
+
+```yaml
+service:
+  entrypoint: mypackage.mcp.server:mcp_app
+  runtime: 413feef          # gapp git ref to install gapp_run from (commit, tag, or branch)
   auth:
     enabled: true
-    strategy: bearer      # default; or google_oauth2
+    strategy: bearer        # or google_oauth2
 ```
+
+**When to enable:** Any deployed service where clients shouldn't hold raw upstream credentials directly. The wrapper mediates: clients authenticate with a PAT (lightweight JWT), and the server looks up the real credential server-side.
+
+**`runtime`** — required when auth is enabled. Specifies which version of the `gapp_run` wrapper to install from the gapp GitHub repo. Use a commit SHA or tag for reproducibility. Bump this and commit to get a new container build with updated wrapper code.
+
+**Strategies:**
+
+| Strategy | Use when | What happens |
+|----------|----------|-------------|
+| `bearer` | Upstream API uses a static token (API key, session token) | Token is passed through as-is to the solution |
+| `google_oauth2` | Upstream API uses Google OAuth2 (e.g., Gmail, Calendar) | Refresh token is used to obtain a fresh access token, with automatic refresh and write-back |
+
+The `bearer` strategy covers most cases — Monarch Money, TickTick, and similar services that use session tokens or API keys. Use `google_oauth2` only when the upstream credential is a Google OAuth2 refresh token that needs periodic refresh.
 
 ## Additional Commands
 
