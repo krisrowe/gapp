@@ -228,8 +228,8 @@ gapp init                                        # scaffold solution (existing)
 gapp setup <project-id>                           # GCP foundation only (unchanged)
 gapp secret set <name>                            # prerequisites (existing)
 gapp deploy                                       # local deploy, still works (existing)
-gapp ci init <repo-name>                          # optional: designate CI repo (once per operator)
-gapp ci setup <solution-repo-url>                 # optional: wire solution for CI (once per solution)
+gapp ci init <repo>                               # optional: designate CI repo (once per operator)
+gapp ci setup <repo>                              # optional: wire solution for CI (once per solution)
 gapp ci status                                    # optional: check CI state
 ```
 
@@ -237,9 +237,11 @@ gapp ci status                                    # optional: check CI state
 
 `gapp ci` is a new command group that owns the entire CI concern, split into two phases:
 
-#### `gapp ci init <repo-name>`
+#### `gapp ci init <repo>`
 
 One-time setup per operator. Designates the CI repo — where deployment workflows live.
+
+The `<repo>` argument accepts a repo name or owner/name. If only a name is given, the owner defaults to the authenticated `gh` user. Examples: `personal-projects`, `krisrowe/personal-projects`.
 
 What it does:
 1. Writes the CI repo name to local XDG config (`~/.config/gapp/ci.yaml` or a `ci` section in `solutions.yaml`). This is the authoritative local setting.
@@ -256,11 +258,13 @@ This is the prerequisite for all other `gapp ci` commands. It establishes "where
 
 Prerequisites: `gh` CLI authenticated (unless `--local-only`).
 
-#### `gapp ci setup <solution-repo-url>`
+#### `gapp ci setup <repo>`
 
-Per-solution CI wiring. Run from the solution repo directory (or with `--solution`). Does everything needed to deploy this solution via CI:
+Per-solution CI wiring. The `<repo>` argument is the solution repo to wire up — accepts repo name or owner/name. Since the solution repo may not be owned by the operator, owner/name is typical (e.g., `krisrowe/monarch-access`). If only a name is given, the owner defaults to the authenticated `gh` user.
 
-1. Discovers the operator's CI repo via `gapp-ci` topic (errors if `gapp ci init` hasn't been run)
+Does everything needed to deploy this solution via CI:
+
+1. Discovers the operator's CI repo from local XDG config (errors if `gapp ci init` hasn't been run)
 2. Creates WIF pool + provider in the GCP project (idempotent, first run only per project)
 3. Creates `gapp-deploy` service account with scoped permissions (idempotent, first run only per project)
 4. Adds IAM binding: CI repo can impersonate the deploy SA (idempotent)
