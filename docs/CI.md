@@ -292,55 +292,29 @@ Future: `gapp ci trigger`, `gapp ci logs`.
 
 The `next_step` after `gapp deploy` can suggest: `"To enable CI/CD: gapp ci init <repo-name>"`
 
-## Context Resolution: The `--solution` Flag
+## Context Resolution in CI
 
-### Current state
+### How it works today
 
-The SDK's `resolve_solution(name)` supports explicit name lookup — if a name is provided, it looks it up in `solutions.yaml` and returns the project_id and repo_path. If no name is provided, it falls back to cwd (finds the git root, reads `gapp.yaml`).
+`resolve_solution()` resolves context in two ways:
+1. Explicit name → looks up `solutions.yaml` for project_id and repo_path
+2. Current directory → finds git root, reads `gapp.yaml`, looks up `solutions.yaml`
 
-But the CLI is inconsistent about whether it exposes this:
+`solutions.yaml` is local XDG config (`~/.config/gapp/solutions.yaml`). It's a cache populated by `gapp setup`, not a source of truth. The source of truth is GCP project labels (`gapp-{name}=default`).
 
-| Accepts solution name | Hardcoded to cwd (no name parameter) |
-|---|---|
-| `status [name]` (positional arg) | `deploy` |
-| `mcp status [name]` (positional arg) | `setup` |
-| `mcp connect [name]` (positional arg) | `secrets list/set/add/remove` |
-| `tokens create/revoke` (`--solution` option) | `users register/list/get/update/revoke` |
+### How it works on a CI runner
 
-There's also an inconsistency in how the name is passed — sometimes a positional argument, sometimes `--solution`. The `tokens` commands use `--solution` because they already have a required positional argument (`email`).
+The runner has no `solutions.yaml`. The reusable workflow handles this by:
 
-### The problem in CI
+1. Cloning the solution repo (restores cwd-based resolution — `gapp.yaml` is present)
+2. Running `gapp setup` (no project ID arg — discovers the project via GCP label query, populates `solutions.yaml` on the runner, all steps are idempotent no-ops if already done)
+3. Running `gapp deploy` (reads `solutions.yaml` populated by step 2, works as-is)
 
-In a CI runner (or any remote environment), there's no local `solutions.yaml` and the cwd isn't a solution repo. The workflow runs from the operator's private repo, not the solution repo.
+No new CLI flags needed. `gapp setup` already has GCP label discovery (`_discover_project_from_label` in `setup.py`). Running it first on the runner bootstraps the local cache that all other commands depend on. This is the same thing you'd do on a new workstation.
 
-There are two approaches:
+### Why no new flags
 
-1. **Clone the solution repo on the runner and cd into it.** This restores cwd-based resolution and requires fewer code changes. The reusable workflow handles the clone. `gapp deploy` works as-is.
-
-2. **Pass everything explicitly via flags.** Commands accept `--solution`, `--project`, and `--repo` flags so no local state or cwd is needed.
-
-Approach 1 is simpler and should be the default path — the reusable workflow clones the solution repo before running `gapp deploy`. But approach 2 is still valuable: locally, `--solution` lets you operate on a solution without cd'ing into it, and in CI it provides flexibility when the clone-and-cd pattern doesn't fit.
-
-### What should change
-
-The `--solution` flag (not `--name`, to match the existing convention in `tokens`) should be added to all commands that currently hardcode cwd:
-
-- `gapp deploy --solution <name>`
-- `gapp setup --solution <name>`
-- `gapp secrets list/set/add/remove --solution <name>`
-- `gapp users register/list/get/update/revoke --solution <name>`
-
-This is optional everywhere — cwd remains the default. The flag is a convenience locally and becomes important as gapp usage extends beyond local-only development.
-
-For the commands that currently use a positional `name` argument (`status`, `mcp status`, `mcp connect`), no change is needed — they already work. Whether to also accept `--solution` as an alias for consistency is a minor style question.
-
-### Why this matters for CI
-
-Even if the reusable workflow clones the solution repo (approach 1), the `--solution` flag is still relevant for:
-
-- **`gapp ci init`** — runs from the operator's repo, not the solution repo. Needs to know which solution to generate a workflow for.
-- **MCP server tools** — the gapp admin MCP server may be asked about solutions the operator isn't currently cd'd into.
-- **Future commands** — `gapp ci status`, `gapp ci trigger` will need to reference solutions by name.
+Existing commands work in CI without modification because the reusable workflow reconstructs the expected environment: clone the repo (provides cwd context), run setup (provides `solutions.yaml`). Adding `--project`, `--solution`, or other flags to existing CLI/MCP commands is unnecessary and would add complexity to the existing interface. New flags will only be added if an explicit need arises.
 
 ## What Changes in gapp
 
@@ -350,8 +324,6 @@ Even if the reusable workflow clones the solution repo (approach 1), the `--solu
 2. **`gapp ci status` command** — discover CI repo, report configuration state (SDK reused by `ci setup`)
 3. **`gapp ci setup` command** — create WIF pool/provider/service account in GCP, add IAM binding, generate and push workflow file to CI repo
 4. **Reusable workflow** — `.github/workflows/deploy.yml` in gapp repo
-4. **`--solution` flag** — add to `deploy`, `setup`, `secrets *`, and `users *` (the commands that currently hardcode cwd). See "Context Resolution" section for details.
-5. **Reusable workflow** — `.github/workflows/deploy.yml` in gapp repo
 
 ### No changes needed
 
