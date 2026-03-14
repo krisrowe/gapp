@@ -12,9 +12,9 @@ from gapp.admin.sdk.users import _email_hash, _gcs_path, _object_exists, _read_c
 DEFAULT_DURATION_DAYS = 3650  # 10 years
 
 
-def _require_context() -> dict:
+def _require_context(name: str | None = None) -> dict:
     """Resolve solution context or raise."""
-    ctx = resolve_solution()
+    ctx = resolve_solution(name)
     if not ctx:
         raise RuntimeError(
             "Not inside a gapp solution. Run 'gapp init' first, or cd into a solution repo."
@@ -60,13 +60,13 @@ def create_status_token(solution_name: str, project_id: str) -> str:
     return jwt.encode(payload, signing_key, algorithm="HS256")
 
 
-def create_token(email: str, *, duration_days: int = DEFAULT_DURATION_DAYS) -> dict:
+def create_token(email: str, *, duration_days: int = DEFAULT_DURATION_DAYS, name: str | None = None) -> dict:
     """Create a signed JWT for a registered user.
 
     The user must already exist (credential file in GCS).
     Returns the JWT string and metadata.
     """
-    ctx = _require_context()
+    ctx = _require_context(name)
     bucket = f"gapp-{ctx['name']}-{ctx['project_id']}"
     eh = _email_hash(email)
     gcs_path = _gcs_path(bucket, eh)
@@ -98,12 +98,12 @@ def create_token(email: str, *, duration_days: int = DEFAULT_DURATION_DAYS) -> d
     }
 
 
-def revoke_tokens(email: str) -> dict:
+def revoke_tokens(email: str, *, name: str | None = None) -> dict:
     """Revoke all tokens for a user by setting revoke_before to now.
 
     All JWTs issued before this moment will be rejected.
     """
-    ctx = _require_context()
+    ctx = _require_context(name)
     bucket = f"gapp-{ctx['name']}-{ctx['project_id']}"
     eh = _email_hash(email)
     gcs_path = _gcs_path(bucket, eh)

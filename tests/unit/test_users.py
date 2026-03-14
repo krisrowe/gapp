@@ -95,9 +95,12 @@ class TestListUsers:
     def test_lists_users(self, mock_ctx, mock_run):
         eh = _email_hash("user@example.com")
         objects = json.dumps([{
-            "name": f"auth/{eh}.json",
-            "metadata": {"sub": "user@example.com", "strategy": "bearer"},
-            "updated": "2026-03-13T00:00:00+00:00",
+            "metadata": {
+                "name": f"auth/{eh}.json",
+                "metadata": {"sub": "user@example.com", "strategy": "bearer"},
+                "timeCreated": "2026-03-13T00:00:00+00:00",
+                "updated": "2026-03-13T00:00:00+00:00",
+            },
         }])
         mock_run.return_value = _mock_subprocess_run(stdout=objects)
 
@@ -121,7 +124,7 @@ class TestListUsers:
     @patch("gapp.admin.sdk.users.subprocess.run")
     @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_pagination_limit(self, mock_ctx, mock_run):
-        objects = [{"name": f"auth/hash{i}.json", "metadata": {"sub": "u", "strategy": "bearer"}, "updated": ""} for i in range(5)]
+        objects = [{"metadata": {"name": f"auth/hash{i}.json", "metadata": {"sub": "u", "strategy": "bearer"}, "timeCreated": "", "updated": ""}} for i in range(5)]
         mock_run.return_value = _mock_subprocess_run(stdout=json.dumps(objects))
 
         result = list_users(limit=2)
@@ -132,7 +135,7 @@ class TestListUsers:
     @patch("gapp.admin.sdk.users.subprocess.run")
     @patch("gapp.admin.sdk.users.resolve_solution", return_value=MOCK_CTX)
     def test_pagination_start_index(self, mock_ctx, mock_run):
-        objects = [{"name": f"auth/hash{i}.json", "metadata": {"sub": "u", "strategy": "bearer"}, "updated": ""} for i in range(5)]
+        objects = [{"metadata": {"name": f"auth/hash{i}.json", "metadata": {"sub": "u", "strategy": "bearer"}, "timeCreated": "", "updated": ""}} for i in range(5)]
         mock_run.return_value = _mock_subprocess_run(stdout=json.dumps(objects))
 
         result = list_users(limit=10, start_index=3)

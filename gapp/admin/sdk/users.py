@@ -43,7 +43,7 @@ def _object_exists(gcs_path: str) -> bool:
         capture_output=True,
         text=True,
     )
-    return result.returncode == 0 and gcs_path in result.stdout
+    return result.returncode == 0
 
 
 def register_user(
