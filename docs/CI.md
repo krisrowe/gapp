@@ -224,27 +224,56 @@ Rejected immediately. Massively violates "no phase does double duty." First run 
 ### Chosen design
 
 ```
-gapp init                              # scaffold solution (existing)
-gapp setup <project-id>                # GCP foundation only (unchanged)
-gapp secret set <name>                 # prerequisites (existing)
-gapp deploy                            # local deploy, still works (existing)
-gapp ci init --repo personal-projects  # optional: full CI wiring (new)
+gapp init                                        # scaffold solution (existing)
+gapp setup <project-id>                           # GCP foundation only (unchanged)
+gapp secret set <name>                            # prerequisites (existing)
+gapp deploy                                       # local deploy, still works (existing)
+gapp ci init <repo-name>                          # optional: designate CI repo (once per operator)
+gapp ci setup <solution-repo-url>                 # optional: wire solution for CI (once per solution)
+gapp ci status                                    # optional: check CI state
 ```
 
 `gapp setup` is unchanged — pure GCP foundation (APIs, bucket, label).
 
-`gapp ci` is a new command group that owns the entire CI concern:
-- `gapp ci init --repo <repo>` — does everything needed for CI in one command:
-  1. Creates WIF pool + provider in the GCP project (idempotent, first run only)
-  2. Creates deploy service account with scoped permissions (idempotent, first run only)
-  3. Creates the operator repo if it doesn't exist (via `gh`)
-  4. Configures WIF to trust the operator repo
-  5. Generates and pushes the workflow file for the current solution
-- Future: `gapp ci status`, `gapp ci trigger`, `gapp ci logs`
+`gapp ci` is a new command group that owns the entire CI concern, split into two phases:
 
-The one-to-many relationship: one WIF pool + provider + deploy service account per GCP project, one workflow file per solution. Steps 1-2 are idempotent and only do real work the first time. Steps 3-5 run every time a new solution is wired up.
+#### `gapp ci init <repo-name>`
 
-The `next_step` after `gapp deploy` can suggest: `"To enable CI/CD: gapp ci init --repo <your-repo>"`
+One-time setup per GitHub account. Creates or identifies the operator's CI repo and tags it with a `gapp-ci` GitHub topic (or similar). Ensures exactly one repo is tagged for the authenticated `gh` user. If a repo with the topic already exists and the name doesn't match, it errors — one CI repo per operator.
+
+This is the prerequisite for all other `gapp ci` commands. It establishes "where do my deployment workflows live?" as a discoverable fact, the same way `gapp-solution` topics establish "which repos are solutions?"
+
+Prerequisites: `gh` CLI authenticated.
+
+#### `gapp ci setup <solution-repo-url>`
+
+Per-solution CI wiring. Run from the solution repo directory (or with `--solution`). Does everything needed to deploy this solution via CI:
+
+1. Discovers the operator's CI repo via `gapp-ci` topic (errors if `gapp ci init` hasn't been run)
+2. Creates WIF pool + provider in the GCP project (idempotent, first run only per project)
+3. Creates `gapp-deploy` service account with scoped permissions (idempotent, first run only per project)
+4. Adds IAM binding: CI repo can impersonate the deploy SA (idempotent)
+5. Generates workflow file for this solution with WIF references, project ID, and solution repo URL baked in
+6. Commits and pushes the workflow file to the CI repo
+
+Prerequisites: `gapp ci init` completed, `gapp setup <project-id>` completed for this solution, `gh` and `gcloud` authenticated.
+
+The one-to-many relationship: one CI repo per operator, one WIF pool + provider + deploy SA per GCP project, one workflow file per solution. Steps 2-4 are idempotent and skip if already done.
+
+#### `gapp ci status`
+
+Shows the state of CI configuration. Discovers the CI repo via `gapp-ci` topic using `gh`, then reports:
+
+- Which repo is the CI repo
+- Which solutions have workflow files
+- Whether WIF, SA, and bindings are configured
+- Whether workflows are passing/failing
+
+The SDK operation behind `gapp ci status` is reused by `gapp ci setup` to verify the CI repo exists before proceeding. Same pattern as `gapp status` being reusable infrastructure health checking.
+
+Future: `gapp ci trigger`, `gapp ci logs`.
+
+The `next_step` after `gapp deploy` can suggest: `"To enable CI/CD: gapp ci init <repo-name>"`
 
 ## Context Resolution: The `--solution` Flag
 
@@ -301,7 +330,9 @@ Even if the reusable workflow clones the solution repo (approach 1), the `--solu
 ### Code changes
 
 1. **`_get_access_token()` env var fallback** — check `GOOGLE_OAUTH_ACCESS_TOKEN` before calling `gcloud auth print-access-token`
-2. **`gapp ci init` command** — create WIF pool/provider/service account in GCP, create/update operator repo with workflow file
+2. **`gapp ci init` command** — designate and tag the operator's CI repo
+3. **`gapp ci setup` command** — create WIF pool/provider/service account in GCP, add IAM binding, generate and push workflow file to CI repo
+4. **`gapp ci status` command** — discover CI repo via topic, report configuration state (SDK reused by `ci setup`)
 4. **`--solution` flag** — add to `deploy`, `setup`, `secrets *`, and `users *` (the commands that currently hardcode cwd). See "Context Resolution" section for details.
 5. **Reusable workflow** — `.github/workflows/deploy.yml` in gapp repo
 
@@ -318,7 +349,8 @@ Even if the reusable workflow clones the solution repo (approach 1), the `--solu
 The operator pattern is simple enough to be copy/paste documentation in gapp's README:
 
 1. Run `gapp setup <project-id>` (GCP foundation, same as always)
-2. Run `gapp ci init --repo <your-private-repo>` (creates WIF, deploy service account, and workflow file — all in one command)
-3. Done. Trigger deployments from GitHub UI, CLI, or API.
+2. Run `gapp ci init <your-repo-name>` (designate your CI repo, once per operator)
+3. Run `gapp ci setup <solution-repo-url>` (wire this solution for CI — creates WIF, SA, binding, workflow)
+4. Done. Trigger deployments from GitHub UI, CLI, or API. Check with `gapp ci status`.
 
 For someone else using your public solution repo: clone nothing, fork nothing. Copy the example workflow from gapp's docs into your own repo, fill in your project ID and WIF config, and you're running. Two public products, one private glue repo of your own.
